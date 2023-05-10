@@ -1,0 +1,144 @@
+version: '3'
+
+services:
+  
+  #dokuwiki service
+  dokuwiki:
+    build: requirements/bonus/dokuwiki
+    image: dokuwiki:1.0
+    
+    expose:
+      - "9000"
+    networks:
+      - inception-network
+    volumes:
+      - wiki-volume:/var/www/html/wiki
+    restart: always
+  
+  #redis service
+  redis:
+    build: requirements/bonus/redis
+    image: redis:1.0
+      
+    expose:
+      - "6379"
+    networks:
+      - inception-network
+    depends_on:
+      - wordpress-php-fpm
+    restart: always
+
+  #adminer service
+  adminer:
+    build: requirements/bonus/adminer
+    image: adminer:1.0
+
+    expose:
+      - "9000"
+    networks:
+      - inception-network
+    depends_on:
+      - mariadb
+    restart: always
+
+  #ftp server
+  ftp:
+    build: requirements/bonus/ftp
+    image: ftp:1.0
+    
+    volumes:
+      - wordpress:/var/www/html
+    ports:
+      - "20-21:20-21"
+      - "21100-21110:21100-21110"
+
+    depends_on:
+      - wordpress-php-fpm
+
+    environment:
+      FTP_USER: ${FTP_USER}
+      FTP_PASS: ${FTP_PASS}
+    networks:
+      - inception-network
+    restart: always
+
+  # nginx section
+  nginx:
+    build: requirements/nginx
+    image: inception-nginx:1.0
+
+    volumes:
+      - wordpress:/var/www/html
+    ports:
+      - "443:443"
+    
+    depends_on:
+      - wordpress-php-fpm
+    networks:
+      - inception-network
+
+    restart: always
+        
+  # Wordpress php fpm section
+  wordpress-php-fpm:
+    build: requirements/wordpress
+    image: inception-wordpress:1.0
+    depends_on:
+      - mariadb
+
+    environment:
+      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
+      WORDPRESS_DB_NAME: ${MYSQL_DB_NAME}
+      WORDPRESS_DB_USER: ${MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASS}
+      WORDPRESS_PATH: ${WORDPRESS_PATH}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+    volumes:
+      - wordpress:/var/www/html
+    networks:
+      - inception-network
+    expose:
+      - "9000"
+    restart: always
+
+  # mariadb/mysql section
+  mariadb:
+    build: requirements/mariadb
+    image: inception-mariadb:1.0
+
+    volumes:
+      - mariadb-volume:/var/lib/mysql
+    networks:
+      - inception-network
+    expose:
+      - "3306"
+    env_file:
+      - .env
+    restart: always
+        
+# Networks in the project
+networks:
+  inception-network:
+    driver: bridge
+
+# Volumes
+volumes:
+  wordpress:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/home/$USER/data/wdata'
+  mariadb-volume:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/home/$USER/data/mdata'
+  wiki-volume:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/home/$USER/data/dwiki'
